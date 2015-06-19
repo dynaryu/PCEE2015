@@ -25,16 +25,16 @@ class model(object):
         cc_1 = (bb**2)*(dy-du)**2
         cc_2 = (bb**2) - (ay-au+bb)**2
 
-        self.ellip_b = bb
-        self.ellip_c = np.sqrt(cc_1/cc_2)
+        self.ellip_B = bb
+        self.ellip_C = np.sqrt(cc_1/cc_2)
 
         # compute backbone curve parameters: poly_a, poly_b, poly_c
         self.poly_c = au
         self.poly_b = (ay/dy)/(au-ay)
         self.poly_a = (ay-au)*np.exp(self.poly_b*dy)
 
-    def ellipitical_pushover(self, disp):
-        '''ellipitical_pushover
+    def elliptical_pushover(self, disp):
+        '''elliptical_pushover
             input: disp (array or scalar)
             output: force
         '''
@@ -50,8 +50,8 @@ class model(object):
 
         tf = (np.abs(disp) > self.dy) & (np.abs(disp) < self.du)
         force[tf] = np.sign(disp[tf])*(
-            self.au-self.bbone_B+self.bbone_B*np.sqrt(
-            1.0 -((self.du-np.abs(disp[tf]))/self.bbone_C)**2))
+            self.au-self.ellip_B+self.ellip_B*np.sqrt(
+            1.0 -((self.du-np.abs(disp[tf]))/self.ellip_C)**2))
 
         tf = np.abs(disp) >= self.du
         force[tf] = self.au * np.sign(disp[tf])
@@ -105,9 +105,9 @@ class gmotion(object):
 
         acc_gm = np.load(gfile)
         npts = len(acc_gm)
-        ts_gm = np.arange(0, npts_gm*dt_gmotion, dt_gmotion)
-        ts_ef = np.arange(0, npts_gm*dt_gmotion, dt_analysis) 
-        flin = interp1d(ts_gm, -factor*acc_gm)
+        ts_gm = np.arange(0, npts*dt_gmotion, dt_gmotion)
+        ts_ef = np.arange(0, npts*dt_gmotion, dt_analysis) 
+        flin = interp1d(ts_gm, -factor*acc_gm[:,0])
         self.eforce = flin(ts_ef)
         self.ts = ts_ef
         self.dt = dt_analysis
@@ -140,9 +140,9 @@ def nonlinear_response_sdof(model, gmotion, flag_newmark='LA'):
     eforce = gmotion.eforce
     npts = len(eforce)
 
-    CONST_A = (1.0/(CONST_BETA*gmotion.dt)*self.mass
+    CONST_A = (1.0/(CONST_BETA*gmotion.dt)*model.mass
      + CONST_GAMMA/CONST_BETA*model.damp)
-    CONST_B = 1.0/(2.0*CONST_BETA)*self.mass + gmotion.dt*(
+    CONST_B = 1.0/(2.0*CONST_BETA)*model.mass + gmotion.dt*(
         CONST_GAMMA/(2.0*CONST_BETA)-1.0)*model.damp
 
     disp = np.zeros((npts, 1))
@@ -189,7 +189,7 @@ def nonlinear_response_sdof(model, gmotion, flag_newmark='LA'):
     
     return (disp, vel, acc, force)
 
-def ellipitical_hysteresis(force_current, disp_current, disp_new, hysteresis):
+def ellipitical_hysteresis(force_current, disp_current, disp_new, model):
     ''' ellipitical_hysteresis
     input: fs0: 
             d: 2x1
@@ -197,8 +197,8 @@ def ellipitical_hysteresis(force_current, disp_current, disp_new, hysteresis):
     output: a0, hysteresis
     '''
 
-    Dd = d[1] - d[0]
-    force_new = force_current + model.stiff
+    disp_incr = disp_new - disp_current
+    force_new = force_current + disp_incr*model.ay/model.dy
 
     # Incipient Yielding
     if ((force_new > model.ay) & (force_current <= model.ay) & (
@@ -206,24 +206,25 @@ def ellipitical_hysteresis(force_current, disp_current, disp_new, hysteresis):
         (force_new < -model.ay) & (force_current >= -model.ay) & (
         model.hysteresis['Iunloading'] != -1)):
       
-        hysteresis['ref_d0'] = d[0] + (
-            (np.sign(force_new)*Ay)- force_current) * temp - np.sign(force_new)*Dy       
-        hysteresis['Iunloading'] = 0
+        model.hysteresis['ref_d0'] = disp_current - force_current/(
+            model.ay/model.dy)
+        model.hysteresis['Iunloading'] = 0
   
     # Yielding
-    elif (np.abs(force_new)>Ay) & (np.sign(Dd) == np.sign(force_new)):
-
-        tmp_a =  ellipitical_pushover( d[1]-hysteresis['ref_d0'], backbone )
-        force_new = np.sign(tmp_a) * min( np.abs(force_new), np.abs(tmp_a) )
+    elif (np.abs(force_new) > model.ay) & (np.sign(disp_incr) == np.sign(
+        force_new)):
+        force_ =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
+        force_new = np.sign(force_) * np.min(np.abs(force_new), np.abs(force_))
   
     # Unloading
-    elif (np.abs(force_current)>Ay)  &  (np.sign(Dd) != np.sign(force_current)):
-        hysteresis['Iunloading'] = np.sign(force_new) 
+    elif (np.abs(force_current) > model.ay) & (np.sign(disp_incr) != np.sign(
+        force_current)):
+        model.hysteresis['Iunloading'] = np.sign(force_new) 
 
-    return(fs, hysteresis)
+    return force_new
 
 def modified_Newton_Raphson_method(disp_current, force_current, dres_current, 
-    stiff_hat, stiff_init, hysteresis):
+    model):
 
     # Table 5.7.1. from Chopra Book
     CONST_TOL = 1e-4
@@ -232,20 +233,20 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
     j = 0
 
     delta_u = np.zeros((max_iter, 1))
-    delta_u[0] = dres_current/stiff_hat
+    delta_u[0] = dres_current/model.stiff_hat
 
     while (incr_ratio > CONST_TOL) & (j < max_iter):
                   
         disp_new = disp_current + delta_u[j]
 
         # determine force(j)
-        (force_new, hysteresis) = ellipitical_hysteresis(force_current, 
-            disp_current, disp_new, hysteresis)
+        force_new = ellipitical_hysteresis(force_current, disp_current, 
+            disp_new, model)
 
         dres_new = dres_current - (force_new - force_current + (
-            sitff_hat-stiff_init)*delta_u[j])
+            model.stiff_hat-model.stiff)*delta_u[j])
 
-        delta_u[j+1] = dres_new/stiff_hat # 2.1
+        delta_u[j+1] = dres_new/model.stiff_hat # 2.1
 
         incr_ratio = delta_u[j]/np.sum(delta_u)
 
@@ -256,4 +257,9 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
         force_current = force_new
         dres_current = dres_new
 
-    return (np.sum(delta_u), force_new, hysteresis)
+    return (np.sum(delta_u), force_new)
+
+if __name__ == '__main__':
+    hazus_URML_pre = model(0.35, 0.1, 0.24, 0.2, 2.4, 0.4)
+    el_centro = gmotion('../data/El_Centro_Chopra.npy', 0.02, 0.02)
+    (disp, vel, acc, force) = nonlinear_response_sdof(hazus_URML_pre, el_centro)    
