@@ -2,7 +2,117 @@ import numpy as np
 from scipy.interpolate import interp1d
 #import matplotlib.pyplot as plt
 
-def nonlinear_response_SDOF(T, z, dy, ay, du, au, ag, dtg, dt, flag_newmark='LA'):
+class model(object):
+
+    def __init__(self, period, damp_ratio, dy, ay, du, au):
+        self.mass = 1.0
+        self.period = period # elastic period
+        self.damp_ratio = damp_ratio # damping ratio zi
+        self.dy = dy # yield point
+        self.ay = ay
+        self.du = du # ultimate point
+        self.au = au
+        self.omega = 2.0*np.pi/self.period
+        self.damp = 2.0*self.damp_ratio*self.omega
+        self.stiff = self.omega**2
+        self.stiff_hat = None
+        self.hysteresis = {'ref_d0': 0.0, 'Iunloading': 0}
+
+        # compute backbone curve parameters: B and C
+        bb_1 = (-dy*(au**2) - du*(ay**2) + ay*au*(dy+du))
+        bb_2 = ay*(du-dy) + 2.0*dy*(ay-au)
+        bb = bb_1/bb_2
+        cc_1 = (bb**2)*(dy-du)**2
+        cc_2 = (bb**2) - (ay-au+bb)**2
+
+        self.ellip_b = bb
+        self.ellip_c = np.sqrt(cc_1/cc_2)
+
+        # compute backbone curve parameters: poly_a, poly_b, poly_c
+        self.poly_c = au
+        self.poly_b = (ay/dy)/(au-ay)
+        self.poly_a = (ay-au)*np.exp(self.poly_b*dy)
+
+    def ellipitical_pushover(self, disp):
+        '''ellipitical_pushover
+            input: disp (array or scalar)
+            output: force
+        '''
+        if isinstance(disp, list):
+            disp = np.array(disp)
+        elif isinstance(disp*1.0, float):
+            disp = np.array([disp*1.0])
+
+        force = np.zeros_like(disp)
+
+        tf = np.abs(disp) <= self.dy
+        force[tf] = self.ay/self.dy*disp[tf]
+
+        tf = (np.abs(disp) > self.dy) & (np.abs(disp) < self.du)
+        force[tf] = np.sign(disp[tf])*(
+            self.au-self.bbone_B+self.bbone_B*np.sqrt(
+            1.0 -((self.du-np.abs(disp[tf]))/self.bbone_C)**2))
+
+        tf = np.abs(disp) >= self.du
+        force[tf] = self.au * np.sign(disp[tf])
+
+        return force
+
+    def polynomial_pushvoer(self, disp):
+        
+        if isinstance(disp, list):
+            disp = np.array(disp)
+        elif isinstance(disp*1.0, float):
+            disp = np.array([disp*1.0])
+
+        force = np.zeros_like(disp)
+
+        tf = np.abs(disp) <= self.dy
+        force[tf] = self.ay/self.dy*disp[tf]
+
+        tf = (np.abs(disp) > self.dy) & (np.abs(disp) < self.du)
+        force[tf] = np.sign(disp[tf])*(
+            self.poly_c + self.poly_a*np.exp(-self.poly_b*np.abs(disp[tf])))
+
+        tf = np.abs(disp) >= self.du
+        force[tf] = self.au * np.sign(disp[tf])
+
+        return force
+
+    def elastoplastic_pushvoer(self, disp):
+        
+        if isinstance(disp, list):
+            disp = np.array(disp)
+        elif isinstance(disp*1.0, float):
+            disp = np.array([disp*1.0])
+
+        force = np.zeros_like(disp)
+
+        tf = np.abs(disp) <= self.dy
+        force[tf] = self.ay/self.dy*disp[tf]
+
+        tf = np.abs(disp) > self.dy
+        force[tf] = np.sign(disp[tf])*()
+
+        tf = np.abs(disp) >= self.du
+        force[tf] = self.au * np.sign(disp[tf])
+
+        return(force)
+
+class gmotion(object):
+
+    def __init__(self, gfile, dt_gmotion, dt_analysis, factor=386.089):
+
+        acc_gm = np.load(gfile)
+        npts = len(acc_gm)
+        ts_gm = np.arange(0, npts_gm*dt_gmotion, dt_gmotion)
+        ts_ef = np.arange(0, npts_gm*dt_gmotion, dt_analysis) 
+        flin = interp1d(ts_gm, -factor*acc_gm)
+        self.eforce = flin(ts_ef)
+        self.ts = ts_ef
+        self.dt = dt_analysis
+
+def nonlinear_response_sdof(model, gmotion, flag_newmark='LA'):
 
     '''
     flag_newmark = 'LA'
@@ -13,168 +123,73 @@ def nonlinear_response_SDOF(T, z, dy, ay, du, au, ag, dtg, dt, flag_newmark='LA'
     du = 2.4 # inch
     au = 0.4 # g
     conv_g_inPersec2 = 386.089
-    ag = np.load('/Users/hyeuk/Project/PCEE2015/data/El_Centro_Chopra.npy')*conv_g_inPersec2
+    ag = np.load('../data/El_Centro_Chopra.npy')*conv_g_inPersec2
     dtg = 0.02 # sec 
     dt = 0.02 # sec 
     '''
-    #define [ S, varargout ] = Bilinear_Newmark_v031218( T, z, dy, alpha, ag, Dtg, Dt )
-
-    #
-    # function [ S, varargout ] = Bilinear_Newmark_v031218( T, z, dy, alpha, ag, Dtg, Dt )
-    #
-    # Author:  Nicolas Luco
-    # Last Revised:  18 December 2003
-    # Reference:  "Dynamics of Structures" (1995) by A.K. Chopra 
-    # python coded by Hyeuk Ryu
-    # 
-    # INPUT:
-    # ======
-    # T     = periods                           ( 1 x num_oscillators, or scalar )
-    # z     = damping ratios                    ( " )
-    # dy    = yield displacements               ( " )
-    # alpha = strain hardening ratios           ( " )
-    # ag    = ground acceleration time history  ( length(ag) x 1 )
-    # Dtg   = time step of ag                   ( scalar )
-    # Dt    = analyis time step                 ( scalar )
-    #
-    # OUTPUT:
-    # =======
-    # S.d  = relative displacement spectrum               ( 1 x num_oscillators ) 
-    #  .v  = relative velocity spectrum                   ( " )
-    #  .a  = acceleration spectrum                        ( " )
-    # varargout{1} = E, where ...
-    # E.K  = kinetic energy (at end)                      ( 1 x num_oscillators )
-    #  .D  = energy dissipated by damping (at end)        ( " )
-    #  .S  = strain energy (at end)                       ( " )
-    #  .Y  = energy dissipated by yielding (at end)       ( " )
-    #  .I  = total input energy (at end)                  ( " )
-    # varargout{2} = H, where ...
-    # H.d  = relative displacement response time history  ( length(ag) x num_oscillators ) 
-    #  .v  = relative velocity response time history      ( " )
-    #  .a  = acceleration response time history           ( " )
-    #  .fs = force response time history                  ( " )
-    #
 
     # Newmark parameters definition
     # -----------------------------
-    GAMMA = 1.0/2.0
+    CONST_GAMMA = 0.5
     if flag_newmark == 'LA': 
-        BETA = 1.0/6.0   # linear acceleration (stable if Dt/T<=0.551)
+        CONST_BETA = 1.0/6.0   # linear acceleration (stable if Dt/T<=0.551)
     elif flag_newmark == 'AA':
-        BETA = 1.0/4.0   # average acceleration (unconditionally stable)
+        CONST_BETA = 0.25   # average acceleration (unconditionally stable)
 
-    # m*a + c*v + fs(k,fy,kalpha) = p
-    # -------------------------------
-    m = 1.0
-    w = 2.0*np.pi/T
-    c = z*(2.0*m*w)
-    k = np.power(w,2.0)*m
+    # read earthquake force    
+    eforce = gmotion.eforce
+    npts = len(eforce)
 
-    # backbone parameters BB and CC
-    bb_1 = -dy*(au**2) - du*(ay**2) + ay*au*(dy+du)
-    bb_2 = ay*(du-dy) + 2*dy*(ay-au)
-    bb = bb_1/bb_2
-    cc_1 = (bb**2)*(dy-du)**2
-    cc_2 = (bb**2) - (ay-au+bb)**2
-    cc = np.sqrt(cc_1/cc_2)
+    CONST_A = (1.0/(CONST_BETA*gmotion.dt)*self.mass
+     + CONST_GAMMA/CONST_BETA*model.damp)
+    CONST_B = 1.0/(2.0*CONST_BETA)*self.mass + gmotion.dt*(
+        CONST_GAMMA/(2.0*CONST_BETA)-1.0)*model.damp
 
-    backbone = {}
-    backbone['dy'] = dy
-    backbone['ay'] = ay
-    backbone['du'] = du
-    backbone['au'] = au
-    backbone['B'] = bb
-    backbone['C'] = cc
-
-    # Interpolate p=-ag*m (linearly)
-    # ------------------------------
-    tg = np.arange(0,ag.shape[0])*dtg 
-    t = np.arange(0,tg[-1]+dt,dt)
-    flin = interp1d(tg,-ag[:,0]*m)
-    p = flin(t)
-
-    # Memory allocation & initial conditions
-    # --------------------------------------
-    lp = len(p)
-    disp = np.zeros((lp, 1))
-    vel = np.zeros((lp, 1))
-    acc = np.zeros((lp, 1))
-    fs = np.zeros((lp, 1))
-
-    hysteresis = {}
-    hysteresis['ref_d0'] = 0.0
-    hysteresis['Iunloading'] = 0
+    disp = np.zeros((npts, 1))
+    vel = np.zeros((npts, 1))
+    acc = np.zeros((npts, 1))
+    force = np.zeros((npts, 1))
 
     # Initial calculations
     # --------------------
-    acc[0] = (p[0] - c*vel[0] - fs[0])/m
-    A = 1.0/(BETA*dt)*m + GAMMA/BETA*c
-    B = 1.0/(2.0*BETA)*m + dt*(GAMMA/(2.0*BETA)-1.0)*c
+    acc[0] = (eforce[0] - model.damp*vel[0] - force[0])
+    model.stiff_hat = model.stiff + CONST_A/gmotion.dt
 
-    # Time stepping
+    # Time stepping (Table 5.7.2)
     # -------------
-    for i in range(lp-1):
+    for i in range(npts-1):
 
         # 2.1 
-        DPi = p[i+1]-p[i] + A*vel[i] + B*acc[i]
+        delta_phat = eforce[i+1]-eforce[i] + CONST_A*vel[i] + CONST_B*acc[i]
 
-        # 2.2 determine the tangent stiffness ki
-        ki = k
-
-        ki_hat = ki + A/dt
-    
-        (Ddi, fs[i+1], hysteresis) = ellipitcal_Newton_Raphson( disp[i], fs[i], 
-            DPi, ki_hat, ki, backbone, hysteresis )
+        # 2.2 determine the tangent stiffness ki   
+        (delta_disp, force[i+1]) = modified_Newton_Raphson_method(disp[i], 
+            force[i], delta_phat, model)
 
         # 2.5 
-        Dvi = GAMMA/(BETA*dt)*Ddi - GAMMA/BETA*vel[i] + dt*(
-            1.0-GAMMA/(2.0*BETA))*acc[i]
+        delta_vel = CONST_GAMMA/(CONST_BETA*gmotion.dt)*delta_disp -(
+            CONST_GAMMA/CONST_BETA*vel[i]) + gmotion.dt*(
+            1.0-CONST_GAMMA/(2.0*CONST_BETA))*acc[i]
 
         # 2.7
-        disp[i+1] = disp[i] + Ddi
-        vel[i+1] = vel[i] + Dvi
-        acc[i+1] = (p[i+1] - c*vel[i+1] - fs[i+1])/m
+        disp[i+1] = disp[i] + delta_disp
+        vel[i+1] = vel[i] + delta_vel
+        acc[i+1] = (eforce[i+1] - model.damp*vel[i+1] - force[i+1])/model.mass
 
         #   Dai = 1/(BETA*Dt^2)*Ddi - 1/(BETA*Dt)*v(i,:) - 1/(2*BETA)*a(i,:)  # alternative
         #   a(i+1,:) = a(i,:) + Dai  # alternative
        
-
     # Spectral values
     # ---------------
-    Sdr = np.max(abs(disp),axis=0)
-    Svr = np.max(abs(vel),axis=0)
-    Sar = np.max(abs(acc),axis=0)
-    Sat = np.max(abs(acc + (-p/m)[:,np.newaxis]), axis=0)  # Note: ag itself was not interpolated
-    Sforce = np.max(abs(fs),axis=0)
+    spec_disp = np.max(abs(disp), axis=0)
+    spec_vel = np.max(abs(vel), axis=0)
+    spec_acc = np.max(abs(acc), axis=0)
+    spec_tacc = np.max(abs(acc + (-eforce/model.mass)[:,np.newaxis]), axis=0)  
+    spec_force = np.max(abs(force), axis=0)
     
-    return (Sdr, Sar, Sat, Sforce, disp, vel, acc, fs)
+    return (disp, vel, acc, force)
 
-def ellipitical_pushover(d, backbone):
-    '''ellipitical_pushover
-    input: d (displacement) 2x1
-            backbone (dict) 
-    output: a (force)
-
-    '''
-
-    Dy = backbone['dy']
-    Du = backbone['du']
-    Au = backbone['au']
-    B = backbone['B']
-    C = backbone['C']
-
-    if np.abs(d) <= Dy:
-        a = Ay/Dy*d
-
-    elif (np.abs(d) > Dy) & (np.abs(d) < Du):
-        a = np.sign(d)* (Au - B + B * np.sqrt(1.0 -((Du-np.abs(d))/C)**2))
-
-    else:    
-        a = Au * np.sign(d)
-    
-    return(a)   
-
-def ellipitical_hysteresis(fs0, d, backbone, hysteresis):
+def ellipitical_hysteresis(force_current, disp_current, disp_new, hysteresis):
     ''' ellipitical_hysteresis
     input: fs0: 
             d: 2x1
@@ -182,89 +197,63 @@ def ellipitical_hysteresis(fs0, d, backbone, hysteresis):
     output: a0, hysteresis
     '''
 
-    Dy = backbone['dy']
-    Du = backbone['du']
-    Ay = backbone['ay']
-    Au = backbone['au']
-    B = backbone['B']
-    C = backbone['C']
-
-    ka = Ay/Dy
-
-    fs = np.zeros((2,1));
-    fs[0] = fs0;
-
     Dd = d[1] - d[0]
-    fs[1] = fs[0] + Dd * ka
+    force_new = force_current + model.stiff
 
     # Incipient Yielding
-    if ( (fs[1]> Ay) & (fs[0]<=Ay) & (hysteresis['Iunloading']  != 1) | 
-         (fs[1]< -Ay) & (fs[0]>= -Ay) & (hysteresis['Iunloading'] != -1) ):
-      
-        temp = (d[1]-d[0])/(fs[1]-fs[0])
+    if ((force_new > model.ay) & (force_current <= model.ay) & (
+        model.hysteresis['Iunloading']  != 1) | 
+        (force_new < -model.ay) & (force_current >= -model.ay) & (
+        model.hysteresis['Iunloading'] != -1)):
       
         hysteresis['ref_d0'] = d[0] + (
-            (np.sign(fs[1])*Ay)- fs[0]) * temp - np.sign(fs[1])*Dy       
+            (np.sign(force_new)*Ay)- force_current) * temp - np.sign(force_new)*Dy       
         hysteresis['Iunloading'] = 0
   
     # Yielding
-    elif (np.abs(fs[1])>Ay) & (np.sign(Dd) == np.sign(fs[1])):
+    elif (np.abs(force_new)>Ay) & (np.sign(Dd) == np.sign(force_new)):
 
         tmp_a =  ellipitical_pushover( d[1]-hysteresis['ref_d0'], backbone )
-        fs[1] = np.sign(tmp_a) * min( np.abs(fs[1]), np.abs(tmp_a) )
+        force_new = np.sign(tmp_a) * min( np.abs(force_new), np.abs(tmp_a) )
   
     # Unloading
-    elif (np.abs(fs[0])>Ay)  &  (np.sign(Dd) != np.sign(fs[0])):
-        hysteresis['Iunloading'] = np.sign(fs[1]) 
+    elif (np.abs(force_current)>Ay)  &  (np.sign(Dd) != np.sign(force_current)):
+        hysteresis['Iunloading'] = np.sign(force_new) 
 
     return(fs, hysteresis)
 
-def ellipitcal_Newton_Raphson(disp_i, fs_i, DPi, kt_hat, kt, backbone, 
-    hysteresis):
+def modified_Newton_Raphson_method(disp_current, force_current, dres_current, 
+    stiff_hat, stiff_init, hysteresis):
 
     # Table 5.7.1. from Chopra Book
-    TOL = 1e-4
+    CONST_TOL = 1e-4
     max_iter = 100
     incr_ratio = 1.0
     j = 0
 
-    # initialize data
-    Dd = [] # Delta u(j)
+    delta_u = np.zeros((max_iter, 1))
+    delta_u[0] = dres_current/stiff_hat
 
-    disp = np.zeros((2,1))
-    disp[0] = disp_i
-
-    # fs
-    fs = np.zeros((2,1))
-    fs[0] = fs_i
-
-    # dr
-    dr = np.zeros((max_iter,1))
-    dr[0] = DPi
-
-    while (incr_ratio > TOL) & (j < max_iter):
-
-        Dd.append(dr[j] / kt_hat) # 2.1
+    while (incr_ratio > CONST_TOL) & (j < max_iter):
                   
-        disp[1] = disp[0] + Dd[j]
+        disp_new = disp_current + delta_u[j]
 
-        # determine fs(j+1,:)
-        (fs_temp, hysteresis) = ellipitical_hysteresis( fs[0], disp, 
-            backbone, hysteresis )
+        # determine force(j)
+        (force_new, hysteresis) = ellipitical_hysteresis(force_current, 
+            disp_current, disp_new, hysteresis)
 
-        fs[1] = fs_temp[1]
+        dres_new = dres_current - (force_new - force_current + (
+            sitff_hat-stiff_init)*delta_u[j])
 
-        df = fs[1] - fs[0] + (kt_hat-kt)*Dd[j]
+        delta_u[j+1] = dres_new/stiff_hat # 2.1
 
-        dr[j+1] = dr[j] - df
+        incr_ratio = delta_u[j]/np.sum(delta_u)
 
-        incr_ratio = Dd[j]/sum(Dd)
+        j += 1 # increase index
 
-        # update disp
-        disp[0] = disp[1]
-        fs[0] = fs[1]
+        # update disp, force
+        disp_current = disp_new
+        force_current = force_new
+        dres_current = dres_new
 
-        # increas index
-        j += 1
-
-    return(sum(Dd), fs[1], hysteresis)
+    return (np.sum(delta_u), force_new, hysteresis)
