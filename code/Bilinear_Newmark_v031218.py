@@ -4,17 +4,17 @@ from scipy.interpolate import interp1d
 
 class model(object):
 
-    def __init__(self, period, damp_ratio, dy, ay, du, au):
+    def __init__(self, dy, ay, du, au, damp_ratio):
         self.mass = 1.0
-        self.period = period # elastic period
-        self.damp_ratio = damp_ratio # damping ratio zi
         self.dy = dy # yield point
         self.ay = ay
         self.du = du # ultimate point
         self.au = au
+        self.period = 2.0*np.pi*np.sqrt(self.dy/self.ay) # elastic period        
         self.omega = 2.0*np.pi/self.period
-        self.damp = 2.0*self.damp_ratio*self.omega
-        self.stiff = self.omega**2
+        self.damp_ratio = damp_ratio # damping ratio zi
+        self.damp = 2.0*damp_ratio*self.omega
+        self.stiff = self.omega**2.0
         self.stiff_hat = None
         self.hysteresis = {'ref_d0': 0.0, 'Iunloading': 0}
 
@@ -58,46 +58,46 @@ class model(object):
 
         return force
 
-    def polynomial_pushvoer(self, disp):
+    # def polynomial_pushvoer(self, disp):
         
-        if isinstance(disp, list):
-            disp = np.array(disp)
-        elif isinstance(disp*1.0, float):
-            disp = np.array([disp*1.0])
+    #     if isinstance(disp, list):
+    #         disp = np.array(disp)
+    #     elif isinstance(disp*1.0, float):
+    #         disp = np.array([disp*1.0])
 
-        force = np.zeros_like(disp)
+    #     force = np.zeros_like(disp)
 
-        tf = np.abs(disp) <= self.dy
-        force[tf] = self.ay/self.dy*disp[tf]
+    #     tf = np.abs(disp) <= self.dy
+    #     force[tf] = self.ay/self.dy*disp[tf]
 
-        tf = (np.abs(disp) > self.dy) & (np.abs(disp) < self.du)
-        force[tf] = np.sign(disp[tf])*(
-            self.poly_c + self.poly_a*np.exp(-self.poly_b*np.abs(disp[tf])))
+    #     tf = (np.abs(disp) > self.dy) & (np.abs(disp) < self.du)
+    #     force[tf] = np.sign(disp[tf])*(
+    #         self.poly_c + self.poly_a*np.exp(-self.poly_b*np.abs(disp[tf])))
 
-        tf = np.abs(disp) >= self.du
-        force[tf] = self.au * np.sign(disp[tf])
+    #     tf = np.abs(disp) >= self.du
+    #     force[tf] = self.au * np.sign(disp[tf])
 
-        return force
+    #     return force
 
-    def elastoplastic_pushvoer(self, disp):
+    # def elastoplastic_pushvoer(self, disp):
         
-        if isinstance(disp, list):
-            disp = np.array(disp)
-        elif isinstance(disp*1.0, float):
-            disp = np.array([disp*1.0])
+    #     if isinstance(disp, list):
+    #         disp = np.array(disp)
+    #     elif isinstance(disp*1.0, float):
+    #         disp = np.array([disp*1.0])
 
-        force = np.zeros_like(disp)
+    #     force = np.zeros_like(disp)
 
-        tf = np.abs(disp) <= self.dy
-        force[tf] = self.ay/self.dy*disp[tf]
+    #     tf = np.abs(disp) <= self.dy
+    #     force[tf] = self.ay/self.dy*disp[tf]
 
-        tf = np.abs(disp) > self.dy
-        force[tf] = np.sign(disp[tf])*()
+    #     tf = np.abs(disp) > self.dy
+    #     force[tf] = np.sign(disp[tf])*()
 
-        tf = np.abs(disp) >= self.du
-        force[tf] = self.au * np.sign(disp[tf])
+    #     tf = np.abs(disp) >= self.du
+    #     force[tf] = self.au * np.sign(disp[tf])
 
-        return(force)
+    #     return force
 
 class gmotion(object):
 
@@ -158,7 +158,7 @@ def nonlinear_response_sdof(model, gmotion, flag_newmark='LA'):
     # Time stepping (Table 5.7.2)
     # -------------
     for i in range(npts-1):
-
+        print "Time: %s" %i
         # 2.1 
         delta_phat = eforce[i+1]-eforce[i] + CONST_A*vel[i] + CONST_B*acc[i]
 
@@ -189,40 +189,6 @@ def nonlinear_response_sdof(model, gmotion, flag_newmark='LA'):
     
     return (disp, vel, acc, force)
 
-def ellipitical_hysteresis(force_current, disp_current, disp_new, model):
-    ''' ellipitical_hysteresis
-    input: fs0: 
-            d: 2x1
-            backbone
-    output: a0, hysteresis
-    '''
-
-    disp_incr = disp_new - disp_current
-    force_new = force_current + disp_incr*model.ay/model.dy
-
-    # Incipient Yielding
-    if ((force_new > model.ay) & (force_current <= model.ay) & (
-        model.hysteresis['Iunloading']  != 1) | 
-        (force_new < -model.ay) & (force_current >= -model.ay) & (
-        model.hysteresis['Iunloading'] != -1)):
-      
-        model.hysteresis['ref_d0'] = disp_current - force_current/(
-            model.ay/model.dy)
-        model.hysteresis['Iunloading'] = 0
-  
-    # Yielding
-    elif (np.abs(force_new) > model.ay) & (np.sign(disp_incr) == np.sign(
-        force_new)):
-        force_ =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
-        force_new = np.sign(force_) * np.min(np.abs(force_new), np.abs(force_))
-  
-    # Unloading
-    elif (np.abs(force_current) > model.ay) & (np.sign(disp_incr) != np.sign(
-        force_current)):
-        model.hysteresis['Iunloading'] = np.sign(force_new) 
-
-    return force_new
-
 def modified_Newton_Raphson_method(disp_current, force_current, dres_current, 
     model):
 
@@ -237,6 +203,7 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
 
     while (incr_ratio > CONST_TOL) & (j < max_iter):
                   
+        print "deltaD: %s, incr_ratio: %s" %(delta_u[j], incr_ratio)          
         disp_new = disp_current + delta_u[j]
 
         # determine force(j)
@@ -248,7 +215,7 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
 
         delta_u[j+1] = dres_new/model.stiff_hat # 2.1
 
-        incr_ratio = delta_u[j]/np.sum(delta_u)
+        incr_ratio = delta_u[j+1]/np.sum(delta_u)
 
         j += 1 # increase index
 
@@ -259,7 +226,47 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
 
     return (np.sum(delta_u), force_new)
 
+def ellipitical_hysteresis(force_current, disp_current, disp_new, model):
+    ''' ellipitical_hysteresis
+    input: fs0: 
+            d: 2x1
+            backbone
+    output: a0, hysteresis
+    '''
+
+    disp_incr = disp_new - disp_current
+    force_new = force_current + disp_incr*model.stiff
+
+    # Incipient Yielding
+    if ((force_new > model.ay) & (force_current <= model.ay) & (
+        model.hysteresis['Iunloading']  != 1) | 
+        (force_new < -model.ay) & (force_current >= -model.ay) & (
+        model.hysteresis['Iunloading'] != -1)):
+      
+        model.hysteresis['ref_d0'] = disp_current - force_current/model.stiff
+        model.hysteresis['Iunloading'] = 0
+
+        print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
+            disp_current, disp_new)
+
+    # Yielding
+    elif (np.abs(force_new) > model.ay) & (np.sign(disp_incr) == np.sign(
+        force_new)):
+        force_ =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
+        print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
+        force_new = np.sign(force_) * min(np.abs(force_new), np.abs(force_))
+
+    # Unloading
+    elif (np.abs(force_current) > model.ay) & (np.sign(disp_incr) != np.sign(
+        force_current)):
+        model.hysteresis['Iunloading'] = np.sign(force_new) 
+        print ('Unloading')  
+
+    return force_new
+
 if __name__ == '__main__':
-    hazus_URML_pre = model(0.35, 0.1, 0.24, 0.2, 2.4, 0.4)
-    el_centro = gmotion('../data/El_Centro_Chopra.npy', 0.02, 0.02)
+    conv_g_inPersec2 = 386.089
+    hazus_URML_pre = model(0.24, 0.2*conv_g_inPersec2, 2.4, 0.4*conv_g_inPersec2, 
+        0.1)
+    el_centro = gmotion('../data/El_Centro_Chopra.npy', 0.02, 0.02,factor=386.089*2.0)
     (disp, vel, acc, force) = nonlinear_response_sdof(hazus_URML_pre, el_centro)    
