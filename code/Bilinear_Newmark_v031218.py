@@ -158,7 +158,7 @@ def nonlinear_response_sdof(model, gmotion, flag_newmark='LA'):
     # Time stepping (Table 5.7.2)
     # -------------
     for i in range(npts-1):
-        print "Time: %s" %i
+        #print "Time: %s" %i
         # 2.1 
         delta_phat = eforce[i+1]-eforce[i] + CONST_A*vel[i] + CONST_B*acc[i]
 
@@ -203,7 +203,7 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
 
     while (incr_ratio > CONST_TOL) & (j < max_iter):
                   
-        print "deltaD: %s, incr_ratio: %s" %(delta_u[j], incr_ratio)          
+        #print "deltaD: %s, incr_ratio: %s" %(delta_u[j], incr_ratio)          
         disp_new = disp_current + delta_u[j]
 
         # determine force(j)
@@ -246,21 +246,23 @@ def ellipitical_hysteresis(force_current, disp_current, disp_new, model):
         model.hysteresis['ref_d0'] = disp_current - force_current/model.stiff
         model.hysteresis['Iunloading'] = 0
 
-        print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
-            disp_current, disp_new)
+        force_new =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
+
+        #print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
+        #    disp_current, disp_new)
 
     # Yielding
     elif (np.abs(force_new) > model.ay) & (np.sign(disp_incr) == np.sign(
         force_new)):
         force_ =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
-        print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
+        #print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
         force_new = np.sign(force_) * min(np.abs(force_new), np.abs(force_))
 
     # Unloading
     elif (np.abs(force_current) > model.ay) & (np.sign(disp_incr) != np.sign(
         force_current)):
         model.hysteresis['Iunloading'] = np.sign(force_new) 
-        print ('Unloading')  
+        #print ('Unloading')  
 
     return force_new
 
@@ -268,5 +270,5 @@ if __name__ == '__main__':
     conv_g_inPersec2 = 386.089
     hazus_URML_pre = model(0.24, 0.2*conv_g_inPersec2, 2.4, 0.4*conv_g_inPersec2, 
         0.1)
-    el_centro = gmotion('../data/El_Centro_Chopra.npy', 0.02, 0.02,factor=386.089*2.0)
+    el_centro = gmotion('../data/El_Centro_Chopra.npy', 0.02, 0.02, factor=386.089*1.0)
     (disp, vel, acc, force) = nonlinear_response_sdof(hazus_URML_pre, el_centro)    
