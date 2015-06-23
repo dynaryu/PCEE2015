@@ -2,7 +2,29 @@ import numpy as np
 from scipy.interpolate import interp1d
 #import matplotlib.pyplot as plt
 
-class model(object):
+# class sdof_model_bilinear_backbone(object):
+#     '''SDOF model definition
+#     (dy, ay): yield point 
+#     (du, au): ultimate point
+#     damp_ratio: damping ratio'''
+
+#     def __init__(self, dy, ay, du, au, damp_ratio):
+#         self.mass = 1.0
+#         self.dy = dy # yield point
+#         self.ay = ay
+#         self.alpha = alpha # k2 = alpha*k1
+#         self.period = 2.0*np.pi*np.sqrt(self.dy/self.ay) # elastic period        
+#         self.omega = 2.0*np.pi/self.period
+#         self.damp_ratio = damp_ratio # damping ratio zi
+#         self.damp = 2.0*damp_ratio*self.omega
+#         self.stiff = self.omega**2.0
+#         self.stiff_hat = None
+
+class model_elliptical(object):
+    '''SDOF model definition
+    (dy, ay): yield point 
+    (du, au): ultimate point
+    damp_ratio: damping ratio'''
 
     def __init__(self, dy, ay, du, au, damp_ratio):
         self.mass = 1.0
@@ -16,7 +38,8 @@ class model(object):
         self.damp = 2.0*damp_ratio*self.omega
         self.stiff = self.omega**2.0
         self.stiff_hat = None
-        self.hysteresis = {'ref_d0': 0.0, 'Iunloading': 0}
+        self.ref_d0 = 0.0
+        self.Iunloading = 0
 
         # compute backbone curve parameters: B and C
         bb_1 = (-dy*(au**2) - du*(ay**2) + ay*au*(dy+du))
@@ -28,12 +51,7 @@ class model(object):
         self.ellip_B = bb
         self.ellip_C = np.sqrt(cc_1/cc_2)
 
-        # compute backbone curve parameters: poly_a, poly_b, poly_c
-        self.poly_c = au
-        self.poly_b = (ay/dy)/(au-ay)
-        self.poly_a = (ay-au)*np.exp(self.poly_b*dy)
-
-    def elliptical_pushover(self, disp):
+    def pushover(self, disp):
         '''elliptical_pushover
             input: disp (array or scalar)
             output: force
@@ -57,6 +75,144 @@ class model(object):
         force[tf] = self.au * np.sign(disp[tf])
 
         return force
+
+    def hysteresis(self, force_current, disp_current, disp_new):
+        ''' ellipitical_hysteresis
+        input: fs0: 
+                d: 2x1
+                backbone
+        output: a0, hysteresis
+        '''
+
+        disp_incr = disp_new - disp_current
+        force_new = force_current + disp_incr*self.stiff
+
+        # Incipient Yielding
+        if ((force_new > self.ay) & (force_current <= self.ay) & (
+            self.Iunloading  != 1) | 
+            (force_new < -self.ay) & (force_current >= -self.ay) & (
+            self.Iunloading != -1)):
+          
+            self.ref_d0 = disp_current - force_current/self.stiff
+            self.Iunloading = 0
+
+            force_new =  self.pushover(disp_new-self.ref_d0)
+
+            #print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
+            #    disp_current, disp_new)
+
+        # Yielding
+        elif (np.abs(force_new) > self.ay) & (np.sign(disp_incr) == np.sign(
+            force_new)):
+            force_ =  self.pushover(disp_new-self.ref_d0)
+            #print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
+            force_new = np.sign(force_) * min(np.abs(force_new), np.abs(force_))
+
+        # Unloading
+        elif (np.abs(force_current) > self.ay) & (np.sign(disp_incr) != np.sign(
+            force_current)):
+            self.Iunloading = np.sign(force_new) 
+            #print ('Unloading')  
+
+        return force_new    
+
+# class backbone_ellip(model):
+
+#     def __init__(self, dy, ay, du, au, damp_ratio):
+#         self.mass = 1.0
+#         self.dy = dy # yield point
+#         self.ay = ay
+#         self.du = du # ultimate point
+#         self.au = au
+#         self.period = 2.0*np.pi*np.sqrt(self.dy/self.ay) # elastic period        
+#         self.omega = 2.0*np.pi/self.period
+#         self.damp_ratio = damp_ratio # damping ratio zi
+#         self.damp = 2.0*damp_ratio*self.omega
+#         self.stiff = self.omega**2.0
+#         self.stiff_hat = None
+#         self.hysteresis = {'ref_d0': 0.0, 'Iunloading': 0}
+
+#         self.hysteresis = {'ref_d0': 0.0, 'Iunloading': 0}
+
+#         # compute backbone curve parameters: B and C
+#         bb_1 = (-dy*(au**2) - du*(ay**2) + ay*au*(dy+du))
+#         bb_2 = ay*(du-dy) + 2.0*dy*(ay-au)
+#         bb = bb_1/bb_2
+#         cc_1 = (bb**2)*(dy-du)**2
+#         cc_2 = (bb**2) - (ay-au+bb)**2
+
+#         self.ellip_B = bb
+#         self.ellip_C = np.sqrt(cc_1/cc_2)
+
+#         # compute backbone curve parameters: poly_a, poly_b, poly_c
+#         self.poly_c = au
+#         self.poly_b = (ay/dy)/(au-ay)
+#         self.poly_a = (ay-au)*np.exp(self.poly_b*dy)
+
+#     def elliptical_pushover(self, disp):
+#         '''elliptical_pushover
+#             input: disp (array or scalar)
+#             output: force
+#         '''
+#         if isinstance(disp, list):
+#             disp = np.array(disp)
+#         elif isinstance(disp*1.0, float):
+#             disp = np.array([disp*1.0])
+
+#         force = np.zeros_like(disp)
+
+#         tf = np.abs(disp) <= self.dy
+#         force[tf] = self.ay/self.dy*disp[tf]
+
+#         tf = (np.abs(disp) > self.dy) & (np.abs(disp) < self.du)
+#         force[tf] = np.sign(disp[tf])*(
+#             self.au-self.ellip_B+self.ellip_B*np.sqrt(
+#             1.0 -((self.du-np.abs(disp[tf]))/self.ellip_C)**2))
+
+#         tf = np.abs(disp) >= self.du
+#         force[tf] = self.au * np.sign(disp[tf])
+
+#         return force
+
+#     def ellipitical_hysteresis(force_current, disp_current, disp_new, model):
+#     ''' ellipitical_hysteresis
+#     input: fs0: 
+#             d: 2x1
+#             backbone
+#     output: a0, hysteresis
+#     '''
+
+#     disp_incr = disp_new - disp_current
+#     force_new = force_current + disp_incr*model.stiff
+
+#     # Incipient Yielding
+#     if ((force_new > model.ay) & (force_current <= model.ay) & (
+#         model.Iunloading  != 1) | 
+#         (force_new < -model.ay) & (force_current >= -model.ay) & (
+#         model.Iunloading != -1)):
+      
+#         model.ref_d0 = disp_current - force_current/model.stiff
+#         model.Iunloading = 0
+
+#         force_new =  model.elliptical_pushover(disp_new-model.ref_d0)
+
+#         #print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
+#         #    disp_current, disp_new)
+
+#     # Yielding
+#     elif (np.abs(force_new) > model.ay) & (np.sign(disp_incr) == np.sign(
+#         force_new)):
+#         force_ =  model.elliptical_pushover(disp_new-model.ref_d0)
+#         #print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
+#         force_new = np.sign(force_) * min(np.abs(force_new), np.abs(force_))
+
+#     # Unloading
+#     elif (np.abs(force_current) > model.ay) & (np.sign(disp_incr) != np.sign(
+#         force_current)):
+#         model.Iunloading = np.sign(force_new) 
+#         #print ('Unloading')  
+
+#     return force_new    
 
     # def polynomial_pushvoer(self, disp):
         
@@ -207,8 +363,8 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
         disp_new = disp_current + delta_u[j]
 
         # determine force(j)
-        force_new = ellipitical_hysteresis(force_current, disp_current, 
-            disp_new, model)
+        force_new = model.hysteresis(force_current, disp_current, 
+            disp_new)
 
         dres_new = dres_current - (force_new - force_current + (
             model.stiff_hat-model.stiff)*delta_u[j])
@@ -226,49 +382,9 @@ def modified_Newton_Raphson_method(disp_current, force_current, dres_current,
 
     return (np.sum(delta_u), force_new)
 
-def ellipitical_hysteresis(force_current, disp_current, disp_new, model):
-    ''' ellipitical_hysteresis
-    input: fs0: 
-            d: 2x1
-            backbone
-    output: a0, hysteresis
-    '''
-
-    disp_incr = disp_new - disp_current
-    force_new = force_current + disp_incr*model.stiff
-
-    # Incipient Yielding
-    if ((force_new > model.ay) & (force_current <= model.ay) & (
-        model.hysteresis['Iunloading']  != 1) | 
-        (force_new < -model.ay) & (force_current >= -model.ay) & (
-        model.hysteresis['Iunloading'] != -1)):
-      
-        model.hysteresis['ref_d0'] = disp_current - force_current/model.stiff
-        model.hysteresis['Iunloading'] = 0
-
-        force_new =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
-
-        #print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
-        #    disp_current, disp_new)
-
-    # Yielding
-    elif (np.abs(force_new) > model.ay) & (np.sign(disp_incr) == np.sign(
-        force_new)):
-        force_ =  model.elliptical_pushover(disp_new-model.hysteresis['ref_d0'])
-        #print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
-        force_new = np.sign(force_) * min(np.abs(force_new), np.abs(force_))
-
-    # Unloading
-    elif (np.abs(force_current) > model.ay) & (np.sign(disp_incr) != np.sign(
-        force_current)):
-        model.hysteresis['Iunloading'] = np.sign(force_new) 
-        #print ('Unloading')  
-
-    return force_new
-
 if __name__ == '__main__':
     conv_g_inPersec2 = 386.089
-    hazus_URML_pre = model(0.24, 0.2*conv_g_inPersec2, 2.4, 0.4*conv_g_inPersec2, 
+    hazus_URML_pre = model_elliptical(0.24, 0.2*conv_g_inPersec2, 2.4, 0.4*conv_g_inPersec2, 
         0.1)
     el_centro = gmotion('../data/El_Centro_Chopra.npy', 0.02, 0.02, factor=386.089*1.0)
     (disp, vel, acc, force) = nonlinear_response_sdof(hazus_URML_pre, el_centro)    
