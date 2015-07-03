@@ -9,7 +9,7 @@ from gmotion import gmotion
 class TestLinearResponseSdofFunction(unittest.TestCase):
     """Test for Nonlinear Response Sdof Function"""
 
-    def test_run_elcentro(self):
+    def test_run_linear_elcentro(self):
 
         """ Figure 7.4.2 (p268, Chopra book)
             m = w/g_const, xi = 0, period = 0.5(sec), 
@@ -99,78 +99,51 @@ class TestNonlinearResponseSdofFunction(unittest.TestCase):
 
     def test_run_elcentro(self):
 
-        """ Figure 7.4.2 (p268, Chopra book)
-            m = w/g_const, xi = 0, period = 0.5(sec), 
-        """
         el_centro = np.load('/Users/hyeuk/Project/PCEE2015/data/El_Centro_Chopra.npy')
-        el_centro = gmotion(el_centro, 0.02, 0.005)
+        el_centro = gmotion(el_centro, 0.02)
         g_const = 386.0
 
-#         # Figure 6.6.1 (a) (p209)
-#         result = []
-#         epp = model_bilinear(mass=1.0, period=0.5, fy=10.0, alpha=0.0, 
-#             damp_ratio=0.02)
-#         (dis, _, _, spec_values) = linear_response_sdof(model=epp, 
-#             gmotion=el_centro, gmotion_factor=-1.0*g_const, flag_newmark='AA')    
-#         result.append(spec_values[0])
+        # Figure 7.4.3 (a) (p269)
+        result = []
+        epp = model_bilinear(mass=1.0, period=0.5, fy=10.0, alpha=0.0, 
+            damp_ratio=0.05)
+        (dis, _, _, _, spec_values) = linear_response_sdof(model=epp, 
+            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001, 
+            flag_newmark='AA')
+        result.append(spec_values[0])
+        force0 = epp.omega**2.0*epp.mass*spec_values[0]
 
-#         # Figure 6.6.2 (b) (p209)
-#         epp = model_bilinear(mass=1.0, period=1.0, fy=10.0, alpha=0.0, 
-#             damp_ratio=0.02)
-#         (dis, _, _, spec_values) = linear_response_sdof(model=epp, 
-#             gmotion=el_centro, gmotion_factor=-1.0*g_const, flag_newmark='AA')    
-#         result.append(spec_values[0])
+        # Figure 7.4.3 (b) (p269)
+        epp = model_bilinear(mass=1.0, period=0.5, fy=0.5*force0, alpha=0.0, 
+            damp_ratio=0.05)
+        (dis, _, _, _, spec_values) = nonlinear_response_sdof(model=epp, 
+            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001, 
+            flag_newmark='AA')    
+        result.append(spec_values[0])
 
-#         # Figure 6.6.2 (c) (p209)
-#         epp = model_bilinear(mass=1.0, period=2.0, fy=100000.0, alpha=0.0, 
-#             damp_ratio=0.02)
-#         (dis, _, _, spec_values) = linear_response_sdof(model=epp, 
-#             gmotion=el_centro, gmotion_factor=-1.0*g_const, flag_newmark='AA')    
-#         result.append(spec_values[0])
+        # Figure 7.4.3 (c) (p269)
+        epp = model_bilinear(mass=1.0, period=0.5, fy=0.25*force0, alpha=0.0, 
+            damp_ratio=0.05)
+        (dis, _, _, _, spec_values) = nonlinear_response_sdof(model=epp, 
+            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001, 
+            flag_newmark='AA')    
+        result.append(spec_values[0])
 
-#         # Figure 6.8.4 (p226)       
-#         el_centro = np.load('/Users/hyeuk/Project/PCEE2015/data/El_Centro_Chopra.npy')
-#         el_centro = gmotion(el_centro, 0.02, 0.001)
+        # Figure 7.4.3 (d) (p269)
+        epp = model_bilinear(mass=1.0, period=0.5, fy=0.125*force0, alpha=0.0, 
+            damp_ratio=0.05)
+        (dis, _, _, _, spec_values) = nonlinear_response_sdof(model=epp, 
+            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001, 
+            flag_newmark='AA')    
+        result.append(spec_values[0])
 
-#         epp = model_bilinear(mass=1.0, period=0.02, fy=100000.0, alpha=0.0, 
-#             damp_ratio=0.02)
-#         (_, _, _, tacc, spec_values) = linear_response_sdof(model=epp, 
-#             gmotion=el_centro, gmotion_factor=-1.0*g_const, flag_newmark='AA')    
-#         result.append(spec_values[0])
+        result = np.array(result)
+        expected_result = np.array([2.25, 1.62, 1.75, 2.07])
 
-#         # Figure 6.8.5 (p227)
-#         epp = model_bilinear(mass=1.0, period=30.0, fy=100000.0, alpha=0.0, 
-#             damp_ratio=0.02)
-#         (dis, _, _, _, spec_values) = linear_response_sdof(model=epp, 
-#             gmotion=el_centro, gmotion_factor=-1.0*g_const, flag_newmark='AA')    
-#         result.append(spec_values[0])
-
-
-        # result = np.array(result)[:,0]
-        # expected_result = np.array([2.67, 5.97, 7.47, 8.23])
-
-        # message = 'Expecting %s, but it returns %s' % (
-        #     expected_result, result)
-        # self.assertTrue(np.allclose(
-        #     expected_result, dis, rtol=1e-02), message)
-
-        # weight = 10.0
-        # g_const = 386.089
-        # epp = model_bilinear(mass=weight/g_const, period=0.5, fy=7.5, alpha=0.0, 
-        #     damp_ratio=0.0)
-
-        # (dis, vel, acc, force, _) = nonlinear_response_sdof(model=epp, 
-        #     gmotion=half_sine, gmotion_factor=1.0, flag_newmark='AA')    
-
-        # # displacement
-        # expected_result = np.array(
-        #     [[0.000, 0.0437, 0.2326, 0.6121, 1.1143, 1.6213, 1.9889, 
-        #     2.0947, 1.9233, 1.5593]]).T
-        # message = 'Expecting %s, but it returns %s' % (
-        #     expected_result, dis)
-        # self.assertTrue(np.allclose(
-        #     expected_result, dis, rtol=1e-03), message)
-
+        message = 'Expecting %s, but it returns %s' % (
+            expected_result, result)
+        self.assertTrue(np.allclose(
+            expected_result, result, rtol=1e-02), message)
 
 if __name__ == '__main__':
     unittest.main()
