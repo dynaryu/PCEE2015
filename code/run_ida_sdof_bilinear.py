@@ -11,7 +11,7 @@ from run_nonlinear_sdof import nonlinear_response_sdof
 from model_GA import model_EPP_GA
 from gmotion import gmotion
 
-def compute_IDA(model, gmotion, period, g_const, incr_sa=0.1, df_factor=10.0):
+def compute_IDA(model, grecord, period, g_const, incr_sa=0.1, df_factor=10.0):
 
     df = df_factor*model.dy
     #incr_sa = 0.1
@@ -69,10 +69,10 @@ gmotion_list_file = 'sv_list.csv'
 gmotion_psa_file = 'sv_psa.csv'
 
 gmotion_list = pd.read_csv(os.path.join(gmotion_path, gmotion_list_file))
-gmotion_psa = np.loadtxt(os.path.join(gmotion_path, gmotion_psa_file), delimiter=',', dtype=float)
+gmotion_psa = np.loadtxt(os.path.join(gmotion_path, gmotion_psa_file), 
+    delimiter=',', dtype=float)
 gmotion_period = gmotion_psa[0,:]
 gmotion_psa = gmotion_psa[1:,:]
-
 
 for item in gmotion_list.FileName:
 
@@ -81,7 +81,8 @@ for item in gmotion_list.FileName:
     dt_gmotion = val.DT.values[0]
     dt_analysis = val.DT.values[0]
 
-     = gmotion(gfile, dt_gmotion, dt_analysis, 
-        gmotion_period, gmotion_psa[val.index[0],:])
+    grecord = gmotion(gfile, dt_gmotion, gmotion_period, 
+        gmotion_psa[val.index[0],:])
 
-    (Sdr, Sar, Sat, Sforce, PGA) = compute_IDA(urml_mean_bin, dic_gmotion, 0.0, g_const, incr_sa=0.1, df_factor=10.0)
+    (Sdr, Sar, Sat, Sforce, PGA) = compute_IDA(urml_mean_bin, 
+        dic_gmotion, 0.0, g_const, incr_sa=0.1, df_factor=10.0)
