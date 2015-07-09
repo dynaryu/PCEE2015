@@ -1,0 +1,74 @@
+---
+title: "analysis_sdof_bilin_sdof"
+author: "Hyeuk Ryu"
+date: "7 July 2015"
+output: pdf_document
+---
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{r}
+filename <- "/Users/hyeuk/Project/PCEE2015/data/urmlmean_epp.csv"
+dat <- read.csv(filename)
+head(dat) # Sdr, Sforce, Sat, PGA
+dy <- 3.35325 # yield
+```
+
+You can also embed plots, for example:
+
+```{r, echo=FALSE}
+plot(dat)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+```{r}
+library(segmented)
+tf <- dat$Sdr > dy
+x <- log(dat$Sdr)
+y1 <- log(dat$Sat)
+plot(x,y1)
+lin.mod1 <- lm(y1~x)
+seg1 <- segmented(lin.mod1, seg.Z = ~x, psi=c(1.5, 4.0))
+summary(seg1)
+plot(seg1, add=TRUE, col='red')
+```
+
+```{r}
+x_new <- data.frame(x=seq(0.1, 6.0, by=0.5)) #log
+y1_new <- predict.segmented(seg1, x_new) #log
+plot(dat$Sdr, dat$Sat, xlim=c(1, 50), ylim=c(0, 1.0))
+points(exp(x_new$x), exp(y1_new), pch=22, col='blue')
+```
+
+```{r}
+y2 <- log(dat$Sat[tf]-dat$Sforce[tf])
+plot(x,y2)
+lin.mod2 <- lm(y2~x)
+seg2 <- segmented(lin.mod2, seg.Z = ~x, psi=1.5)
+summary(seg2)
+plot(seg2, add=TRUE, col='red')
+```
+
+```{r}
+y2_new <- predict.segmented(seg2, x_new) #log
+plot(dat$Sdr, dat$Sat)
+ay <- max(dat$Sforce[tf])
+points(exp(x_new$x), exp(y2_new)+ay, pch=22, col='blue')
+points(exp(x_new$x), exp(y1_new), col='red')
+```
+
+```{r}
+# PGA vs. Sat
+x32 <- dat$PGA[tf]
+x31 <- dat$Sdr[tf]
+y3 <- dat$Sat[tf]
+lin.mod3 <- lm(y3~x31+x32)
+#r2 <- with(dat, tapply(Sat, factor, median))
+
+#seg3 <- segmented(lin.mod3, seg.Z = ~x3, psi=1.0)
+#y3_new <- predict.segmented(seg2, x_new) #log
+
+```

@@ -8,8 +8,8 @@ def read_EQRM_bldg_params(bldg_type, g_const,
     bldg_params = pd.read_csv(EQRM_input_file)
 
     idx = np.where(bldg_params.structure_classification == bldg_type.upper())[0]
-    
-    if len(idx) > 0: 
+
+    if len(idx) > 0:
 
         # idx 50 for URMLMEAN
         cs = bldg_params['design_strength'].values[idx]
@@ -19,7 +19,7 @@ def read_EQRM_bldg_params(bldg_type, g_const,
         gamma_ = bldg_params['yield_to_design'].values[idx] # 1
         lambda_ = bldg_params['ultimate_to_yield'].values[idx] # 1.5
         mu_ = bldg_params['ductility'].values[idx] # 1.5
-        damp_ratio = bldg_params['damping_Be'].values[idx] 
+        damp_ratio = bldg_params['damping_Be'].values[idx]
 
         ay = cs*gamma_/alpha1
         au = lambda_*ay
@@ -27,8 +27,8 @@ def read_EQRM_bldg_params(bldg_type, g_const,
         du = lambda_*mu_*dy
 
     else:
-        print('There is no %s.' %bldg_type)    
-       
+        print('There is no %s.' %bldg_type)
+
     return (dy, ay*g_const, du, au*g_const, damp_ratio, period)
 
 def model_EPP_GA(bldg_type, g_const):
@@ -40,15 +40,15 @@ def model_EPP_GA(bldg_type, g_const):
 
 class model_GA(object):
     '''SDOF model definition
-    (dy, fy): yield point 
+    (dy, fy): yield point
     (alpha): k2/k1
     damp_ratio: damping ratio'''
 
     def __init__(self, dy, fy, du, fu, damp_ratio):
         '''dy, du (meter)
            fy, fu (g)
-           conv_factor 
-        '''   
+           conv_factor
+        '''
         self.mass = 1.0
         self.dy = dy # yield point
         self.fy = fy
@@ -61,7 +61,7 @@ class model_GA(object):
         self.CONST_B = fy/(dy*(fu-fy))
         self.CONST_A = (self.fy-self.fu)*np.exp(self.CONST_B*dy)
 
-        self.period = 2.0*np.pi*np.sqrt(dy/fy) # elastic period        
+        self.period = 2.0*np.pi*np.sqrt(dy/fy) # elastic period
         self.omega = 2.0*np.pi/self.period
         self.damp = 2.0*damp_ratio*self.omega
         self.stiff_hat = None
