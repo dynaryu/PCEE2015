@@ -1,3 +1,11 @@
+# coding=utf-8
+"""
+- ** Nonlinear Response Analysis of SDOF System Test Cases.**
+
+"""
+__author__ = 'dynaryu@gmail.com'
+__date__ = '11/7/2015'
+
 import unittest
 import numpy as np
 
@@ -20,47 +28,42 @@ class TestLinearResponseSdofFunction(unittest.TestCase):
 
         # Figure 6.6.1 (a) (p209)
         result = []
-        epp = model_bilinear(mass=1.0, period=0.5, fy=10.0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=0.5, fy=10.0, alpha=0.0,\
             damp_ratio=0.02)
-        response = linear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.005,
-            flag_newmark='AA')
+        response = linear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.005, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
         # Figure 6.6.2 (b) (p209)
-        epp = model_bilinear(mass=1.0, period=1.0, fy=10.0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=1.0, fy=10.0, alpha=0.0,\
             damp_ratio=0.02)
-        response = linear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.005,
-            flag_newmark='AA')
+        response = linear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.005, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
         # Figure 6.6.2 (c) (p209)
-        epp = model_bilinear(mass=1.0, period=2.0, fy=10.0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=2.0, fy=10.0, alpha=0.0,\
             damp_ratio=0.02)
-        response = linear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.005,
-            flag_newmark='AA')
+        response = linear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.005, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
         # Figure 6.8.4 (p226)
-        epp = model_bilinear(mass=1.0, period=0.02, fy=10.0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=0.02, fy=10.0, alpha=0.0,\
             damp_ratio=0.02)
-        response = linear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001,
-            flag_newmark='AA')
+        response = linear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.001, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['tacc']/g_const)
 
         # Figure 6.8.5 (p227)
-        epp = model_bilinear(mass=1.0, period=30.0, fy=10.0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=30.0, fy=10.0, alpha=0.0,\
             damp_ratio=0.02)
-        response = linear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.005,
-            flag_newmark='AA')
+        response = linear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.005, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
@@ -73,7 +76,7 @@ class TestLinearResponseSdofFunction(unittest.TestCase):
             expected_result, result, rtol=1e-02), message)
 
 class TestNonlinearResponseSdofFunction(unittest.TestCase):
-    """Test for Nonlinear Response Sdof Function"""
+    """Test for Nonliner Response Sdof with Elastoplastic Function"""
 
     def test_simple(self):
 
@@ -82,18 +85,18 @@ class TestNonlinearResponseSdofFunction(unittest.TestCase):
             period = 1.0(sec)
         """
         half_sine = gmotion(np.array(
-            [[0.0, 5.0, 8.6602, 10.0, 8.6603, 5.0, 0.0, 0.0, 0.0, 0.0]]).T,
+            [[0.0, 5.0, 8.6602, 10.0, 8.6603, 5.0, 0.0, 0.0, 0.0, 0.0]]).T,\
             0.1)
 
-        epp = model_bilinear(mass=0.2533, period=1.0, fy=7.5, alpha=0.00,
+        epp = model_bilinear(mass=0.2533, period=1.0, fy=7.5, alpha=0.00,\
             damp_ratio=0.05)
 
-        response = nonlinear_response_sdof(model=epp,
-            grecord=half_sine, grecord_factor=1.0, dt_comp = 0.1, flag_newmark='AA')
+        response = nonlinear_response_sdof(model=epp, grecord=half_sine,\
+            grecord_factor=1.0, dt_comp=0.1, flag_newmark='AA')
 
         # displacement
         expected_result = np.array(
-            [0.000, 0.0437, 0.2326, 0.6121, 1.1143, 1.6213, 1.9889,
+            [0.000, 0.0437, 0.2326, 0.6121, 1.1143, 1.6213, 1.9889,\
             2.0947, 1.9233, 1.5593])
         message = 'Expecting %s, but it returns %s' % (
             expected_result, response.dis.values)
@@ -104,39 +107,35 @@ class TestNonlinearResponseSdofFunction(unittest.TestCase):
 
         # Figure 7.4.3 (a) (p269)
         result = []
-        epp = model_bilinear(mass=1.0, period=0.5, fy=10.0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=0.5, fy=10.0, alpha=0.0,\
             damp_ratio=0.05)
-        response = linear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001,
-            flag_newmark='AA')
+        response = linear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.001, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
         force0 = epp.omega**2.0*epp.mass*spec_values['dis']
 
         # Figure 7.4.3 (b) (p269)
-        epp = model_bilinear(mass=1.0, period=0.5, fy=0.5*force0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=0.5, fy=0.5*force0, alpha=0.0,\
             damp_ratio=0.05)
-        response = nonlinear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001,
-            flag_newmark='AA')
+        response = nonlinear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.001, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
         # Figure 7.4.3 (c) (p269)
-        epp = model_bilinear(mass=1.0, period=0.5, fy=0.25*force0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=0.5, fy=0.25*force0, alpha=0.0,\
             damp_ratio=0.05)
-        response = nonlinear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001,
-            flag_newmark='AA')
+        response = nonlinear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.001, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
         # Figure 7.4.3 (d) (p269)
-        epp = model_bilinear(mass=1.0, period=0.5, fy=0.125*force0, alpha=0.0,
+        epp = model_bilinear(mass=1.0, period=0.5, fy=0.125*force0, alpha=0.0,\
             damp_ratio=0.05)
-        response = nonlinear_response_sdof(model=epp,
-            grecord=el_centro, grecord_factor=-1.0*g_const, dt_comp=0.001,
-            flag_newmark='AA')
+        response = nonlinear_response_sdof(model=epp, grecord=el_centro,\
+            grecord_factor=-1.0*g_const, dt_comp=0.001, flag_newmark='AA')
         spec_values = np.abs(response).max()
         result.append(spec_values['dis'])
 
@@ -147,6 +146,10 @@ class TestNonlinearResponseSdofFunction(unittest.TestCase):
             expected_result, result)
         self.assertTrue(np.allclose(
             expected_result, result, rtol=1e-02), message)
+
+#class TestNonlinearResponseSdofFunction(unittest.TestCase):
+#    """Test for Nonlinear Response Sdof Function"""
+
 
 if __name__ == '__main__':
     unittest.main()

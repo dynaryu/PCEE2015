@@ -1,3 +1,5 @@
+import numpy as np
+
 class model_elliptical(object):
     '''SDOF model definition
     (dy, fy): yield point 
@@ -14,7 +16,7 @@ class model_elliptical(object):
         self.omega = 2.0*np.pi/self.period
         self.damp_ratio = damp_ratio # damping ratio zi
         self.damp = 2.0*damp_ratio*self.omega
-        self.stiff = self.omega**2.0
+        self.stiff = fy/dy #self.omega**2.0
         self.stiff_hat = None
         self.ref_d0 = 0.0
         self.Iunloading = 0
@@ -54,7 +56,7 @@ class model_elliptical(object):
 
         return force
 
-    def determine_stiff(self):
+    def determine_stiff(self, dres_current, force_current, dis_current):
         pass
 
     def hysteresis(self, force_current, dis_current, dis_new):
@@ -69,30 +71,33 @@ class model_elliptical(object):
         force_new = force_current + dis_incr*self.stiff
 
         # Incipient Yielding
-        if ((force_new > self.fy) & (force_current <= self.fy) & (
-            self.Iunloading  != 1) | 
+        tf = ((force_new > self.fy) & (force_current <= self.fy) & (
+            self.Iunloading != 1) | 
             (force_new < -self.fy) & (force_current >= -self.fy) & (
-            self.Iunloading != -1)):
-          
+            self.Iunloading != -1))
+        
+        if tf:  
             self.ref_d0 = dis_current - force_current/self.stiff
             self.Iunloading = 0
-
-            force_new =  self.pushover(dis_new-self.ref_d0)
 
             #print 'Incipient: fs0:%s, fs1: %s, d0: %s d1: %s' %(force_current, force_new,
             #    dis_current, dis_new)
 
         # Yielding
-        elif (np.abs(force_new) > self.fy) & (np.sign(dis_incr) == np.sign(
-            force_new)):
+        tf = (np.abs(force_new) > self.fy) & (np.sign(dis_incr) == np.sign(
+            force_new))
+        
+        if tf:
             force_ =  self.pushover(dis_new-self.ref_d0)
             #print 'Yielding: fs_new=%s, force_:%s' %(force_new, force_)
             force_new = np.sign(force_) * min(np.abs(force_new), np.abs(force_))
 
         # Unloading
-        elif (np.abs(force_current) > self.fy) & (np.sign(dis_incr) != np.sign(
-            force_current)):
+        tf = (np.abs(force_current) > self.fy) & (np.sign(dis_incr) != np.sign(
+            force_current))
+
+        if tf:
             self.Iunloading = np.sign(force_new) 
             #print ('Unloading')  
 
-        return force_new    
+        return force_new

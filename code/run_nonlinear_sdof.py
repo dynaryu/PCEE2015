@@ -132,11 +132,16 @@ def nonlinear_response_sdof(model, grecord, grecord_factor, dt_comp, \
     # --------------------
     acc[0] = (eforce[0] - model.damp*vel[0] - force[0])
 
+    if hasattr(model, 'ref_d0'):
+        model.ref_d0 = 0.0
+        model.Iunloading = 0
+
     # Time stepping (Table 5.7.2)
     # -------------
     for i in range(npts-1):
         #print "Time: %s" %i
         # 2.1
+
         delta_phat = eforce[i+1]-eforce[i] + const_a*vel[i] + const_b*acc[i]
 
         # determine ki

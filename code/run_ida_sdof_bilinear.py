@@ -102,6 +102,8 @@ def predict_segmented(x, regression_params):
 
 g_const = 9.806
 
+print "******"
+
 # model definition
 #urml_mean_bin = model_EPP_GA('urmlmean', g_const)
 

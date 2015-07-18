@@ -3,7 +3,7 @@ require(segmented)
 
 args <- commandArgs(TRUE)
 filename = args[1]
-period = as.numeric(args[2])
+threshold = as.numeric(args[2])
 
 sink(paste(strsplit(filename,'.csv'),'.txt',sep=""))
 
@@ -27,16 +27,23 @@ print(filename)
 #     dat$psa[tf] <- dat$scale[tf]*gm_psa[i]
 # }
 
+m2mm = 1000.0
+g_const = 9.806
+
 dat <- read.csv(filename)
-omega_2 <- (2.0*pi/period)**2.0
-dy <- max(dat$force)/omega_2
-tf <- dat$dis > dy
+
+dat$dis <- dat$dis*m2mm
+threshold <- threshold*m2mm
+dat$force <- dat$force/g_const
+dat$tacc <- dat$tacc/g_const
+
+tf <- dat$dis > threshold
 
 # unit conversion mm and g
-ndat <- data.frame(x=log(dat$dis[tf]*1000.0), y=log(dat$tacc[tf]-dat$force[tf])-log(9.806))
+ndat <- data.frame(x=log(dat$dis[tf]), y=log(dat$tacc[tf]-dat$force[tf]))
 ndat <- ndat[complete.cases(ndat),]
 lin.mod <- lm(y~x, ndat)
-seg <- segmented(lin.mod, seg.Z = ~x, psi=log(1.1*dy*1000.0))
+seg <- segmented(lin.mod, seg.Z = ~x, psi=log(1.1*threshold))
 summary(seg)
 slope(seg)
 
@@ -60,4 +67,26 @@ dev.off()
 jpeg(file=paste(strsplit(filename,'.csv'),'_resid.jpeg',sep=""))
 plot(ndat$x, resid(seg), col='red')
 dev.off()
+
+fitted_seg <- function(seg, ndat) {
+
+	intercept <- seg$coefficients[1]
+	slope1 <- seg$coefficients[2]
+	slope2 <- seg$coefficients[3]+seg$coefficients[2]
+	break_pt <- seg$psi[2]
+
+	y <- numeric(length(ndat$x))
+
+	# tf = dat$dis < dy
+	# abs_acc[tf] = dat$force[tf]
+	# print(sum(tf))
+
+	tf = ndat$x < break_pt
+    y[tf] = intercept + slope1*ndat$x[tf]
+
+    tf = ndat$x >= break_pt
+    y[tf] = intercept + slope1*break_pt + slope2*(ndat$x[tf]-break_pt)
+
+	return(y)
+}
 

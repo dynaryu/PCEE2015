@@ -2,6 +2,42 @@ import numpy as np
 import pandas as pd
 from model_bilinear import model_bilinear
 
+def compare_bldg_params_HAZUS_GA(input_file_GA, bldg_types_GA,
+    input_file_HAZUS, bldg_types_HAZUS):
+
+    if input_file_GA is None:    
+        input_file_GA = '/Users/hyeuk/Project/eqrm/resources/data/building_parameters.csv'
+    
+    if input_file_HAZUS is None:
+        input_file_HAZUS ='/Users/hyeuk/Project/eqrm/resources/data/building_parameters_hazus.csv'
+
+    bldg_params_GA = pd.read_csv(input_file_GA)
+    bldg_params_HAZUS = pd.read_csv(input_file_HAZUS)
+
+    if (bldg_types_GA is None) or (bldg_types_HAZUS is None):
+        bldg_types_GA= np.intersect1d(bldg_params_HAZUS.\
+            structure_classification,
+        bldg_params_GA.structure_classification)
+        bldg_types_HAZUS = bldg_types_GA
+
+    col_names = list(np.intersect1d(bldg_params_HAZUS.columns,\
+        bldg_params_GA.columns))
+    [col_names.remove(x) for x in ['structure_class',\
+        'structure_classification']] 
+
+    for (bldg_GA, bldg_HAZUS) in zip(bldg_types_GA, bldg_types_HAZUS):
+
+        for col in col_names:
+
+            value_GA = bldg_params_GA.loc[bldg_params_GA.\
+                structure_classification==bldg_GA][col].values
+            value_HAZUS = bldg_params_HAZUS.loc[bldg_params_HAZUS.\
+                structure_classification==bldg_HAZUS][col].values
+
+            if not np.isclose(value_HAZUS, value_GA):
+                print "%s of %s for GA: %s vs. %s for HAZUS: %s" %(
+                    col, bldg_GA, value_GA, bldg_HAZUS, value_HAZUS)
+
 def read_EQRM_bldg_params(bldg_type, g_const,
     EQRM_input_file = '/Users/hyeuk/Project/eqrm/resources/data/building_parameters.csv'):
 
