@@ -38,6 +38,47 @@ def compare_bldg_params_HAZUS_GA(input_file_GA, bldg_types_GA,
                 print "%s of %s for GA: %s vs. %s for HAZUS: %s" %(
                     col, bldg_GA, value_GA, bldg_HAZUS, value_HAZUS)
 
+def validate_bldg_params_HAZUS(input_file_HAZUS, bldg_types_HAZUS, code_level='Pre'):
+
+    if input_file_HAZUS is None:
+        input_file_HAZUS ='/Users/hyeuk/Project/eqrm/resources/data/building_parameters_hazus.csv'
+
+    bldg_params_HAZUS = pd.read_csv(input_file_HAZUS)
+
+    import scipy.io
+    HAZUS_mat = scipy.io.loadmat('/Users/hyeuk/Project/PCEE2015/data/Bldg_HAZUS_Capa_Para.mat')
+
+    if bldg_type_HAZUS is None:
+        bldg_types_HAZUS = HAZUS_mat['Bldg_Type'][:,0]
+
+    mapping = {'design_strength': 'Bldg_Design_Strength',
+    'height': 'Bldg_Height',
+    'natural_elastic_period': 'Bldg_Period',
+    'fraction_in_first_mode': 'Bldg_Modal_Factor_Weight',
+    'height_to_displacement': 'Bldg_Modal_Factor_Height',
+    'yield_to_design': 'Bldg_Overstrength_Ratio_Yield',
+    'ultimate_to_yield': 'Bldg_Overstrength_Ratio_Ultimate',
+    'ductility': 'Bldg_Ductility',     
+    'damping_Be':  'Bldg_Elastic_Damping'}
+
+    for btype in bldg_types_HAZUS:
+
+        btype = str(btype[0])
+
+        (irow, icol) = np.where((HAZUS_mat['Bldg_Type']==btype) 
+            & (HAZUS_mat['Bldg_Code_Level']==code_level))
+
+        for att in mapping.keys():
+
+            value = bldg_params_HAZUS.loc[bldg_params_HAZUS.\
+                structure_classification==btype][att].values
+
+            ref = HAZUS_mat[mapping[att]][irow,icol] 
+
+            if not np.isclose(value, ref):
+                print "%s of %s is %s, not machting with %s" %(
+                    att, btype, value, ref)
+
 def read_EQRM_bldg_params(bldg_type, g_const,
     EQRM_input_file = '/Users/hyeuk/Project/eqrm/resources/data/building_parameters.csv'):
 
