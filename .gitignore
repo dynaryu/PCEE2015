@@ -1,0 +1,13 @@
+*.pyc
+*.DS_Store
+\#*\#
+\.\#*
+.coverage
+*.jp*
+*.png
+*~
+*_flymake.py
+TAGS
+build
+dist
+*.swp

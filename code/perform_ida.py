@@ -51,7 +51,9 @@ def IDA_limit(model, grecord, period, dt_comp, g_const, incr_sa=0.1,
 
 def IDA_scale(model, grecord, period, dt_comp, g_const, im_range):
 
-    idx_model_period = np.where(grecord.period == model.period)[0]
+    idx_model_period = (np.abs(grecord.period - model.period)).argmin()
+    #idx_model_period = np.where(grecord.period == model.period)[0]
+    
     scale2dy = 0.8*model.fy/(grecord.psa[idx_model_period]*g_const)
 
     idx_period = np.where(grecord.period == period)[0]
