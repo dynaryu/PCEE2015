@@ -58,7 +58,7 @@ def main(argv):
     dt_comp = 0.005
     g_const = 9.806
 
-    HAZUS_BLDG_TYPES = ['URML']
+    #HAZUS_BLDG_TYPES = ['URML']
 
     for bldg in HAZUS_BLDG_TYPES:
 
