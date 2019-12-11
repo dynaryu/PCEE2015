@@ -1,0 +1,12 @@
+#!/bin/bash
+#PBS -l wd
+#PBS -m e
+#PBS -q normal
+#PBS -l ncpus=4,walltime=10:00:00,mem=1GB
+PYTHONPATH=/short/w84/Shapely/lib/python2.6/site-packages/:$HOME/eqrm:$HOME/lib/python2.7/site-packages/
+export PYTHONPATH
+module unload intel-fc intel-cc
+module load python/2.7.3
+module load python/2.7.3-matplotlib
+time python $HOME/scratch/PCEE2015/code/run_ida_sdof_elliptic.py -e $HOME/building_parameters_hazus.csv -o $HOME/scratch/PCEE2015/output/ -g $HOME/sv01-30/
+

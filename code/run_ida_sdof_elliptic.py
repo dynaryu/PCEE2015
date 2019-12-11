@@ -47,6 +47,10 @@ def main(argv):
         'C2L', 'C2M', 'C2H', 'C3L', 'C3M', 'C3H', 'PC1', 'PC2L', 'PC2M',\
         'PC2H', 'RM1L', 'RM1M', 'RM2L', 'RM2M', 'RM2H', 'URML', 'URMM', 'MH']
 
+    HAZUS_BLDG_TYPES = ['S5L', 'S5M', 'S5H', 'C1L', 'C1M', 'C1H',\
+        'C2L', 'C2M', 'C2H', 'C3L', 'C3M', 'C3H', 'PC1', 'PC2L', 'PC2M',\
+        'PC2H', 'RM1L', 'RM1M', 'RM2L', 'RM2M', 'RM2H', 'URMM', 'MH']
+ 
     gmotion_list = pd.read_csv(os.path.join(gmotion_path, 'sv_list.csv'))
     gmotion_psa = np.loadtxt(os.path.join(gmotion_path, 'sv_psa.csv'),\
         delimiter=',', dtype=float)
